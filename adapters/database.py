@@ -159,6 +159,9 @@ class DatabaseAdapter:
             
             async with aiosqlite.connect(self.db_path) as db:
                 # Сохраняем запись о еде
+                # Извлекаем данные из анализа (поддерживаем обе структуры)
+                food_data = self._extract_food_data(analysis)
+                
                 await db.execute("""
                     INSERT INTO food_entries (
                         user_id, date, 
@@ -168,10 +171,10 @@ class DatabaseAdapter:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_id, today,
-                    analysis.total_calories, analysis.total_protein, 
-                    analysis.total_carbs, analysis.total_fat, analysis.total_fiber,
-                    analysis.berries_grams, analysis.red_meat_grams, 
-                    analysis.seafood_grams, analysis.nuts_grams, analysis.vegetables_grams,
+                    food_data['calories'], food_data['protein'], 
+                    food_data['carbs'], food_data['fat'], food_data['fiber'],
+                    food_data['berries'], food_data['red_meat'], 
+                    food_data['seafood'], food_data['nuts'], food_data['vegetables'],
                     analysis.model_dump_json()
                 ))
                 
@@ -179,12 +182,51 @@ class DatabaseAdapter:
                 await self._update_daily_stats(db, user_id, today)
                 
                 await db.commit()
-                logger.info(f"Сохранен анализ еды для пользователя {user_id}: {analysis.total_calories} ккал")
+                logger.info(f"Сохранен анализ еды для пользователя {user_id}: {food_data['calories']} ккал")
                 return True
                 
         except Exception as e:
             logger.error(f"Ошибка сохранения анализа еды: {e}")
             return False
+    
+    def _extract_food_data(self, analysis) -> dict:
+        """
+        Извлекает данные из анализа (поддерживает обе структуры)
+        
+        Args:
+            analysis: FoodAnalysisResult или ProfessionalFoodAnalysis
+            
+        Returns:
+            Словарь с унифицированными данными
+        """
+        if hasattr(analysis, 'totals'):
+            # Новая структура ProfessionalFoodAnalysis
+            return {
+                'calories': float(analysis.totals.kcal),
+                'protein': float(analysis.totals.protein_g),
+                'carbs': float(analysis.totals.carb_g),
+                'fat': float(analysis.totals.fat_g),
+                'fiber': float(analysis.totals.fiber_g),
+                'berries': 0.0,  # TODO: добавить в новую схему
+                'red_meat': 0.0,  # TODO: добавить в новую схему
+                'seafood': 0.0,   # TODO: добавить в новую схему
+                'nuts': 0.0,      # TODO: добавить в новую схему
+                'vegetables': 0.0 # TODO: добавить в новую схему
+            }
+        else:
+            # Старая структура FoodAnalysisResult
+            return {
+                'calories': float(getattr(analysis, 'total_calories', 0)),
+                'protein': float(getattr(analysis, 'total_protein', 0)),
+                'carbs': float(getattr(analysis, 'total_carbs', 0)),
+                'fat': float(getattr(analysis, 'total_fat', 0)),
+                'fiber': float(getattr(analysis, 'total_fiber', 0)),
+                'berries': float(getattr(analysis, 'berries_grams', 0)),
+                'red_meat': float(getattr(analysis, 'red_meat_grams', 0)),
+                'seafood': float(getattr(analysis, 'seafood_grams', 0)),
+                'nuts': float(getattr(analysis, 'nuts_grams', 0)),
+                'vegetables': float(getattr(analysis, 'vegetables_grams', 0))
+            }
     
     async def _update_daily_stats(self, db: aiosqlite.Connection, user_id: int, date: str):
         """Обновляет агрегированную статистику за день"""

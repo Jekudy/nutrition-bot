@@ -27,7 +27,9 @@ class NutritionTracker:
             True при успехе, False при ошибке
         """
         try:
-            logger.info(f"Сохраняем анализ для пользователя {user_id}: {analysis.total_calories} ккал")
+            # Определяем калории в зависимости от типа анализа
+            calories = self._get_calories_from_analysis(analysis)
+            logger.info(f"Сохраняем анализ для пользователя {user_id}: {calories} ккал")
             
             # Сохраняем через адаптер БД
             success = await self.db.save_food_entry(user_id, analysis)
@@ -42,6 +44,17 @@ class NutritionTracker:
         except Exception as e:
             logger.error(f"Ошибка сохранения анализа для пользователя {user_id}: {e}")
             return False
+    
+    def _get_calories_from_analysis(self, analysis) -> float:
+        """Извлекает калории из анализа (поддерживает обе структуры)"""
+        if hasattr(analysis, 'totals') and hasattr(analysis.totals, 'kcal'):
+            # Новая структура ProfessionalFoodAnalysis
+            return float(analysis.totals.kcal)
+        elif hasattr(analysis, 'total_calories'):
+            # Старая структура FoodAnalysisResult
+            return float(analysis.total_calories)
+        else:
+            return 0.0
     
     async def get_daily_progress(self, user_id: int) -> Optional[DailyNutritionStats]:
         """
