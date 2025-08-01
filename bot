@@ -1,0 +1,4 @@
+#!/bin/bash
+# Удобная обертка для bot_manager.py
+
+python3 bot_manager.py "$@"
