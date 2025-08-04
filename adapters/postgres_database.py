@@ -4,7 +4,7 @@ PostgreSQL Database Adapter для Railway deployment
 import asyncpg
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, Dict, Any, List
 from shared.logger import get_logger
 from shared.models import FoodAnalysisResult, DailyNutritionStats, UserProfile
@@ -291,7 +291,7 @@ class PostgreSQLAdapter:
         """Получает историю приемов пищи"""
         try:
             # Вычисляем дату начала
-            start_date = date.today() - date.timedelta(days=days)
+            start_date = date.today() - timedelta(days=days)
             
             conn = await asyncpg.connect(self.database_url)
             
@@ -310,6 +310,62 @@ class PostgreSQLAdapter:
         except Exception as e:
             logger.error(f"Ошибка получения истории питания: {e}")
             return []
+    
+    async def update_user_settings(self, user_id: int, settings: Dict[str, Any]) -> bool:
+        """
+        Обновляет настройки пользователя
+        
+        Args:
+            user_id: ID пользователя
+            settings: Словарь с настройками
+            
+        Returns:
+            True при успехе, False при ошибке
+        """
+        try:
+            conn = await asyncpg.connect(self.database_url)
+            
+            await conn.execute(
+                "UPDATE users SET settings = $1 WHERE user_id = $2",
+                json.dumps(settings, ensure_ascii=False), user_id
+            )
+            
+            await conn.close()
+            logger.info(f"Настройки пользователя {user_id} обновлены")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка обновления настроек пользователя {user_id}: {e}")
+            return False
+    
+    async def get_user_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получает настройки пользователя
+        
+        Args:
+            user_id: ID пользователя
+            
+        Returns:
+            Словарь с настройками или None
+        """
+        try:
+            conn = await asyncpg.connect(self.database_url)
+            
+            row = await conn.fetchrow(
+                "SELECT settings FROM users WHERE user_id = $1",
+                user_id
+            )
+            
+            await conn.close()
+            
+            if row and row['settings']:
+                return dict(row['settings'])
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Ошибка получения настроек пользователя {user_id}: {e}")
+            return None
     
     async def close(self):
         """Закрывает соединение с базой данных"""
