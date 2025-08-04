@@ -17,7 +17,7 @@ from services.photo_analyzer import PhotoAnalyzer
 from services.nutrition_tracker import NutritionTracker
 from services.daily_planner import DailyPlanner
 from services.daily_reporter import DailyReporter
-from services.scheduler import Scheduler
+# Scheduler не нужен в webhook версии
 from shared.cloud_logger import get_logger, setup_flask_logging
 from shared.models import UserProfile
 
@@ -39,7 +39,7 @@ class NutritionBotWebhook:
         self.nutrition_tracker = NutritionTracker(self.db)
         self.daily_planner = DailyPlanner(self.openai, self.db)
         self.daily_reporter = DailyReporter(self.openai, self.db)
-        self.scheduler = Scheduler()
+        # Scheduler не используется в webhook версии
         
         # Настройка Telegram бота
         self.token = os.getenv('TELEGRAM_BOT_TOKEN')
